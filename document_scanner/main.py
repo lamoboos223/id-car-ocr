@@ -1,52 +1,67 @@
-from paddleocr import PaddleOCR
+import pytesseract
+from PIL import Image
 import re
 
-class DocumentScanner:
-    def __init__(self):
-        self.ocr = PaddleOCR(use_angle_cls=True, lang='en')
+def extract_fields(text):
+    # Initialize variables
+    name = None
+    id_number = None
+    expiry_date = None
+    
+    # Print raw text for debugging
+    print("\nRaw extracted text:")
+    print("-" * 50)
+    print(text)
+    print("-" * 50)
+    
+    # Process each line
+    for line in text.split('\n'):
+        line = line.strip()
+        print(f"Processing line: '{line}'")  # Debug line
         
-    def extract_info(self, image_path):
-        # Read the image
-        results = self.ocr.ocr(image_path, cls=True)
+        # Look for name (assuming it's in capital letters)
+        if re.search(r'^[A-Z\s]+$', line) and len(line) > 5:
+            print(f"Found potential name: {line}")
+            name = line
         
-        # Initialize dictionary to store extracted information
-        info = {
-            'name': None,
-            'date_of_birth': None,
-            'id_number': None,
-            'expiry_date': None
-        }
+        # Look for ID number (assuming it's alphanumeric)
+        id_match = re.search(r'\b[A-Z0-9]{6,}\b', line)
+        if id_match:
+            print(f"Found potential ID: {id_match.group()}")
+            id_number = id_match.group()
         
-        # Process each detected text
-        for line in results:
-            for word_info in line:
-                text = word_info[1][0]  # Get the text
-                confidence = word_info[1][1]  # Get the confidence score
-                print(f"Detected text: {text} (confidence: {confidence:.2f})")  # Debug line
-                
-                # Same extraction logic as above
-                if re.search(r'^[A-Z\s]+$', text) and len(text) > 5:
-                    info['name'] = text
-                
-                dob_match = re.search(r'\d{2}[/-]\d{2}[/-]\d{4}|\d{2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}', text, re.IGNORECASE)
-                if dob_match and not info['date_of_birth']:
-                    info['date_of_birth'] = dob_match.group()
-                
-                id_match = re.search(r'[A-Z0-9]{6,}', text)
-                if id_match and not info['id_number']:
-                    info['id_number'] = id_match.group()
-                    
-        return info
+        # Look for expiry date
+        date_match = re.search(r'\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b', line)
+        if date_match:
+            print(f"Found potential date: {date_match.group()}")
+            expiry_date = date_match.group()
+    
+    return name, id_number, expiry_date
 
 def main():
-    scanner = DocumentScanner()
-    image_path = "./2.png"  # Update this path
+    # Set the path to the Tesseract executable
+    # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
     
-    info = scanner.extract_info(image_path)
-    
-    print("\nExtracted Information:")
-    for key, value in info.items():
-        print(f"{key}: {value}")
+    try:
+        # Load and process the image
+        image = Image.open('./2.png')
+        
+        # Perform OCR
+        extracted_text = pytesseract.image_to_string(image)
+        
+        # Parse the extracted text
+        name, id_number, expiry_date = extract_fields(extracted_text)
+        
+        # Print the extracted information
+        print("\nExtracted Information:")
+        print(f'Name: {name}')
+        print(f'ID Number: {id_number}')
+        print(f'Expiry Date: {expiry_date}')
+        
+    except FileNotFoundError:
+        print("Error: Image file not found. Please check the file path.")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     main()
